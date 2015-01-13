@@ -59,6 +59,27 @@ def closestFood(pos, food, walls):
     # no food found
     return None
 
+def closestScaredGhost(pos,ghosts,walls):
+    """
+    Returns the closest scared ghost, tells pacman that he can go after the nearest ghost if it's scared   
+    """   
+    fringe = [(pos[0], pos[1], 0)]
+    expanded = set()
+    while fringe:
+        pos_x, pos_y, dist = fringe.pop(0)
+        if (pos_x, pos_y) in expanded:
+            continue
+        expanded.add((pos_x, pos_y))
+        # if we find a food at this location then exit
+        
+        if (pos_x,pos_y) in ghosts:
+            return dist
+                
+        # otherwise spread out from the location to its neighbours
+        nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
+        for nbr_x, nbr_y in nbrs:
+            fringe.append((nbr_x, nbr_y, dist+1))
+
 class SimpleExtractor(FeatureExtractor):
     """
     Returns simple features for a basic reflex Pacman:
@@ -70,9 +91,10 @@ class SimpleExtractor(FeatureExtractor):
 
     def getFeatures(self, state, action):
         # extract the grid of food and wall locations and get the ghost locations
-        food = state.getFood()
-        walls = state.getWalls()
-        ghosts = state.getGhostPositions()
+        food         = state.getFood()
+        walls        = state.getWalls()
+        ghosts       = state.getGhostPositions()
+        ghostsStates = state.getGhostStates()
 
         features = util.Counter()
 
@@ -84,16 +106,28 @@ class SimpleExtractor(FeatureExtractor):
         next_x, next_y = int(x + dx), int(y + dy)
 
         # count the number of ghosts 1-step away
-        features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
-
+#         features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
+        scaredGhostsPositions = []
+        for ghostState in ghostsStates:
+            if ghostState.scaredTimer == 0 and (next_x, next_y) in Actions.getLegalNeighbors(ghostState.getPosition(), walls):
+                features["#-of-ghosts-1-step-away"] += 1
+            elif ghostState.scaredTimer > 0:
+                features["eats-ghost"] = 1
+                scaredGhostsPositions.append(ghostState.getPosition())
+        
+        if len( scaredGhostsPositions ) > 0:
+            dist = closestScaredGhost((next_x, next_y), scaredGhostsPositions, walls)
+            if dist is not None:
+                features["closest-scared-ghost"] = float(dist) / (walls.width * walls.height)
+        
         # if there is no danger of ghosts then add the food feature
         if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
             features["eats-food"] = 1.0
 
         dist = closestFood((next_x, next_y), food, walls)
         if dist is not None:
-            # make the distance a number less than one otherwise the update
-            # will diverge wildly
+            # make the distance a number less than one otherwise the update will diverge wildly
             features["closest-food"] = float(dist) / (walls.width * walls.height)
+            
         features.divideAll(10.0)
         return features

@@ -207,5 +207,4 @@ class ApproximateQAgent(PacmanQAgent):
         # did we finish training?
         if self.episodesSoFar == self.numTraining:
             # you might want to print your weights here for debugging
-            #for weightKey, weightValue in self.weights: print 'For weight ' + weightKey + ': ' + weightValue
-            pass
+            for weightKey, weightValue in self.weights.iteritems(): print 'For weight ' + str(weightKey) + ': ' + str(weightValue)
